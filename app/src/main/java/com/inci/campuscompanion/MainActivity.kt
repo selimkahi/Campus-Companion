@@ -34,18 +34,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.inci.campuscompanion.data.EventsRepository
-import com.inci.campuscompanion.data.remote.CampusApiClient
-import com.inci.campuscompanion.data.remote.EventsRemoteDataSource
-import com.inci.campuscompanion.ui.EventsScreen
-import com.inci.campuscompanion.ui.EventsViewModel
 import com.inci.campuscompanion.data.AppDatabase
 import com.inci.campuscompanion.data.TaskRepository
 import com.inci.campuscompanion.data.UserPreferencesRepository
@@ -53,7 +47,12 @@ import com.inci.campuscompanion.data.dataStore
 import com.inci.campuscompanion.model.Task
 import com.inci.campuscompanion.ui.MainViewModel
 import com.inci.campuscompanion.ui.theme.CampusCompanionTheme
-
+import androidx.compose.material3.Button
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.inci.campuscompanion.data.EventsModule
+import com.inci.campuscompanion.ui.EventsScreen
+import com.inci.campuscompanion.ui.EventsViewModel
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -67,43 +66,60 @@ class MainActivity : ComponentActivity() {
             MainViewModel.Factory(preferencesRepository, taskRepository)
         }
 
-        val eventsViewModel: EventsViewModel by viewModels {
-            EventsViewModel.Factory(
-                EventsRepository(EventsRemoteDataSource(CampusApiClient.api))
-            )
-        }
-
         setContent {
             val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
             val tasks by viewModel.tasks.collectAsStateWithLifecycle()
-            val eventsState by eventsViewModel.uiState.collectAsStateWithLifecycle()
-            var showEvents by rememberSaveable { mutableStateOf(true) }
 
             CampusCompanionTheme(darkTheme = isDarkMode) {
+
+                var showEvents by rememberSaveable {
+                    mutableStateOf(false)
+                }
+
+                val eventsViewModel: EventsViewModel =
+                    viewModel(factory = EventsModule.factory)
+
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Column(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            TextButton(onClick = { showEvents = true }, modifier = Modifier.weight(1f)) {
-                                Text("Events")
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding)
+                    ) {
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(onClick = { showEvents = false }) {
+                                Text("My Tasks")
                             }
-                            TextButton(onClick = { showEvents = false }, modifier = Modifier.weight(1f)) {
-                                Text("Tasks")
+
+                            Button(onClick = { showEvents = true }) {
+                                Text("Campus Events")
                             }
                         }
-                        HorizontalDivider()
+
                         if (showEvents) {
-                            EventsScreen(
-                                state = eventsState,
-                                onRefresh = eventsViewModel::refresh,
-                                modifier = Modifier.weight(1f)
-                            )
+
+                            EventsScreen(viewModel = eventsViewModel)
+
                         } else {
+
                             TaskScreen(
                                 isDarkMode = isDarkMode,
-                                onToggleDarkMode = { viewModel.toggleDarkMode(it) },
+                                onToggleDarkMode = {
+                                    viewModel.toggleDarkMode(it)
+                                },
                                 tasks = tasks,
-                                onToggleTask = { viewModel.toggleTaskCompletion(it) },
-                                onAddTask = { title, description -> viewModel.upsertTask(title, description) },
+                                onToggleTask = {
+                                    viewModel.toggleTaskCompletion(it)
+                                },
+                                onAddTask = { title, description ->
+                                    viewModel.upsertTask(title, description)
+                                },
                                 modifier = Modifier.weight(1f)
                             )
                         }

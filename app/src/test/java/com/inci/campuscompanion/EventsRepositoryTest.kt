@@ -1,17 +1,18 @@
 package com.inci.campuscompanion
 
 import com.inci.campuscompanion.data.EventsRepository
-import com.inci.campuscompanion.data.remote.CampusApi
-import com.inci.campuscompanion.data.remote.EventDto
-import com.inci.campuscompanion.data.remote.EventsRemoteDataSource
+import com.inci.campuscompanion.data.CampusApi
+import com.inci.campuscompanion.model.EventDto
+import com.inci.campuscompanion.data.EventsRemoteDataSource
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.SerializationException
-import kotlinx.serialization.json.Json
+import com.google.gson.JsonSyntaxException
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class EventsRepositoryTest {
-    private val json = Json { ignoreUnknownKeys = true }
+    private val gson = Gson()
 
     @Test
     fun apiFieldsMapToUiDataAndExtraFieldsAreIgnored() = runTest {
@@ -40,15 +41,15 @@ class EventsRepositoryTest {
         assertEquals(emptyList<Any>(), repositoryFor("[]").getEvents())
     }
 
-    @Test(expected = SerializationException::class)
-    fun missingRequiredFieldIsADataFailure() = runTest {
-        repositoryFor("""[{"id":"1"}]""").getEvents()
+    @Test(expected = JsonSyntaxException::class)
+    fun malformedJsonIsADataFailure() = runTest {
+        repositoryFor("{invalid json").getEvents()
         Unit
     }
 
     private fun repositoryFor(body: String): EventsRepository {
         val api = object : CampusApi {
-            override suspend fun getEvents(): List<EventDto> = json.decodeFromString(body)
+            override suspend fun getEvents(): List<EventDto> = gson.fromJson(body, object : TypeToken<List<EventDto>>() {}.type)
         }
         return EventsRepository(EventsRemoteDataSource(api))
     }

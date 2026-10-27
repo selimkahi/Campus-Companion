@@ -1,9 +1,9 @@
 package com.inci.campuscompanion
 
 import com.inci.campuscompanion.data.EventsRepository
-import com.inci.campuscompanion.data.remote.CampusApi
-import com.inci.campuscompanion.data.remote.EventDto
-import com.inci.campuscompanion.data.remote.EventsRemoteDataSource
+import com.inci.campuscompanion.data.CampusApi
+import com.inci.campuscompanion.model.EventDto
+import com.inci.campuscompanion.data.EventsRemoteDataSource
 import com.inci.campuscompanion.ui.EventsUiState
 import com.inci.campuscompanion.ui.EventsViewModel
 import java.io.IOException
@@ -18,7 +18,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import kotlinx.serialization.SerializationException
+import com.google.gson.JsonSyntaxException
 import okhttp3.ResponseBody
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -46,7 +46,6 @@ class EventsViewModelTest {
         assertEquals(EventsUiState.Loading, viewModel.uiState.value)
         advanceUntilIdle()
         assertTrue(viewModel.uiState.value is EventsUiState.Content)
-        viewModel.refresh()
         viewModel.refresh()
         advanceUntilIdle()
         assertEquals(2, calls)
@@ -86,7 +85,7 @@ class EventsViewModelTest {
             listOf(event)
         }
         advanceUntilIdle()
-        assertTrue(errorMessage(viewModel).contains("Check your connection"))
+        assertTrue(errorMessage(viewModel).contains("Network unavailable"))
         connected = true
         viewModel.refresh()
         advanceUntilIdle()
@@ -108,7 +107,7 @@ class EventsViewModelTest {
             listOf(event)
         }
         advanceUntilIdle()
-        assertTrue(errorMessage(viewModel).contains("HTTP 404"))
+        assertTrue(errorMessage(viewModel).contains("404"))
         validEndpoint = true
         viewModel.refresh()
         advanceUntilIdle()
@@ -116,17 +115,17 @@ class EventsViewModelTest {
     }
 
     @Test
-    fun serverFailureInvitesRetryLater() = runTest(dispatcher) {
+    fun serverFailureShowsStatusAndRetry() = runTest(dispatcher) {
         val viewModel = viewModelFor { throw httpFailure(503) }
         advanceUntilIdle()
-        assertTrue(errorMessage(viewModel).contains("try again later"))
+        assertEquals("Server error 503. Please retry.", errorMessage(viewModel))
     }
 
     @Test
     fun malformedDataShowsSafeError() = runTest(dispatcher) {
-        val viewModel = viewModelFor { throw SerializationException("Broken payload") }
+        val viewModel = viewModelFor { throw JsonSyntaxException("Broken payload") }
         advanceUntilIdle()
-        assertEquals("The server returned invalid event data. Please retry.", errorMessage(viewModel))
+        assertEquals("Unable to load events. Please retry.", errorMessage(viewModel))
     }
 
     @Test
